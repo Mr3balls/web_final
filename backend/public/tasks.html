@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="navbar">
+        <a href="/tasks">Tasks</a>
+        <a href="/profile">Profile</a>
+        <a href="/logout">Logout</a>
+    </div>    
+    <div class="container">
+        <h2>Your Tasks</h2>
+
+        <!-- Status message display -->
+        <div id="status-message" class="status-message" style="display: none;"></div>
+
+        <!-- Форма поиска задачи по ID -->
+        <form id="search-task-form">
+            <input type="text" id="search-task-id" placeholder="Enter Task ID" required>
+            <button type="submit">Search</button>
+        </form>
+
+        <div id="search-result" class="search-result" style="display: none;">
+            <h3>Search Result</h3>
+            <div id="search-task"></div>
+        </div>
+
+        <form id="create-task-form">
+            <input type="text" id="task-title" placeholder="Task Title" required>
+            <textarea id="task-description" placeholder="Task Description"></textarea>
+            <input type="date" id="task-dueDate">
+            <button type="submit">Create Task</button>
+        </form>
+        <ul id="task-list">
+            <!-- Task list will be populated here -->
+        </ul>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
+        async function getTasks() {
+    const response = await fetch('http://localhost:5000/api/tasks', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    const data = await response.json();
+    const taskList = document.getElementById('task-list');
+    taskList.innerHTML = '';
+
+    data.forEach(task => {
+        taskList.innerHTML += `
+            <li id="task-${task._id}">
+                <p><strong>ID:</strong> ${task._id}</p>
+                <h3>${task.title}</h3>
+                <p>${task.description}</p>
+                <p><strong>Due Date:</strong> ${task.dueDate}</p>
+                <button onclick="showUpdateForm('${task._id}', '${task.title}', '${task.description}', '${task.dueDate}')">Update</button>
+                <button onclick="deleteTask('${task._id}')">Delete</button>
+
+                <!-- Update form (hidden by default) -->
+                <div id="update-form-${task._id}" class="update-form" style="display: none;">
+                    <input type="text" id="update-title-${task._id}" value="${task.title}" required>
+                    <textarea id="update-description-${task._id}" required>${task.description}</textarea>
+                    <input type="date" id="update-dueDate-${task._id}" value="${task.dueDate}">
+                    <button onclick="updateTask('${task._id}')">Save Changes</button>
+                    <button onclick="cancelUpdate('${task._id}')">Cancel</button>
+                </div>
+            </li>
+        `;
+    });
+}
+
+
+        async function searchTaskById(e) {
+            e.preventDefault();
+            const taskId = document.getElementById('search-task-id').value;
+
+            const response = await fetch(`http://localhost:5000/api/tasks/${taskId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+            const searchResult = document.getElementById('search-result');
+            const searchTaskDiv = document.getElementById('search-task');
+
+            if (response.status === 200) {
+                searchTaskDiv.innerHTML = `
+                    <h3>${data.title}</h3>
+                    <p>${data.description}</p>
+                    <p>Due Date: ${data.dueDate}</p>
+                `;
+                searchResult.style.display = 'block';
+            } else {
+                searchResult.style.display = 'none';
+                showStatusMessage('Task not found!', 'error');
+            }
+        }
+
+        async function createTask(e) {
+            e.preventDefault();
+            const title = document.getElementById('task-title').value;
+            const description = document.getElementById('task-description').value;
+            const dueDate = document.getElementById('task-dueDate').value;
+
+            const response = await fetch('http://localhost:5000/api/tasks', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ title, description, dueDate })
+            });
+
+            const data = await response.json();
+            if (response.status === 201) {
+                showStatusMessage('Task created!', 'success');
+                getTasks();
+            } else {
+                showStatusMessage(data.message, 'error');
+            }
+        }
+
+        async function deleteTask(taskId) {
+            const response = await fetch(`http://localhost:5000/api/tasks/${taskId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+            if (response.status === 200) {
+                showStatusMessage('Task deleted!', 'success');
+                getTasks();
+            } else {
+                showStatusMessage(data.message, 'error');
+            }
+        }
+
+        async function updateTask(taskId) {
+            const title = document.getElementById(`update-title-${taskId}`).value;
+            const description = document.getElementById(`update-description-${taskId}`).value;
+            const dueDate = document.getElementById(`update-dueDate-${taskId}`).value;
+
+            const updatedTask = {
+                title,
+                description,
+                dueDate,
+            };
+
+            const response = await fetch(`http://localhost:5000/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatedTask)
+            });
+
+            const data = await response.json();
+            if (response.status === 200) {
+                showStatusMessage('Task updated!', 'success');
+                getTasks();
+            } else {
+                showStatusMessage(data.message, 'error');
+            }
+        }
+
+        function showUpdateForm(taskId, title, description, dueDate) {
+            document.getElementById(`update-form-${taskId}`).style.display = 'block';
+            document.getElementById(`update-title-${taskId}`).value = title;
+            document.getElementById(`update-description-${taskId}`).value = description;
+            document.getElementById(`update-dueDate-${taskId}`).value = dueDate;
+        }
+
+        function cancelUpdate(taskId) {
+            document.getElementById(`update-form-${taskId}`).style.display = 'none';
+        }
+
+        function showStatusMessage(message, type) {
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = message;
+
+            if (type === 'success') {
+                statusMessage.style.backgroundColor = 'green';
+                statusMessage.style.color = 'white';
+            } else if (type === 'error') {
+                statusMessage.style.backgroundColor = 'red';
+                statusMessage.style.color = 'white';
+            }
+
+            statusMessage.style.display = 'block';
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        document.getElementById('search-task-form').addEventListener('submit', searchTaskById);
+        document.getElementById('create-task-form').addEventListener('submit', createTask);
+
+        getTasks();
+    </script>
+</body>
+</html>

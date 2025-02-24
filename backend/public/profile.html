@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="navbar">
+        <a href="/tasks">Tasks</a>
+        <a href="/profile">Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+    
+    <div class="container">
+        <h2>Your Profile</h2>
+        <div id="profile-info">
+            <!-- User info will be displayed here -->
+        </div>
+        <button id="edit-profile-btn">Edit Profile</button>
+        <form id="edit-profile-form" style="display:none;">
+            <input type="text" id="new-username" placeholder="New Username">
+            <input type="email" id="new-email" placeholder="New Email">
+            <button type="submit">Save Changes</button>
+        </form>
+        <button id="logout-btn">Logout</button>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
+        async function getProfile() {
+            const response = await fetch('http://localhost:5000/api/auth/profile', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await response.json();
+            if (response.status === 200) {
+                document.getElementById('profile-info').innerHTML = `
+                    <p>Username: ${data.username}</p>
+                    <p>Email: ${data.email}</p>
+                `;
+            } else {
+                alert(data.message);
+            }
+        }
+
+        document.getElementById('edit-profile-btn').addEventListener('click', () => {
+            document.getElementById('edit-profile-form').style.display = 'block';
+        });
+
+        document.getElementById('edit-profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newUsername = document.getElementById('new-username').value;
+            const newEmail = document.getElementById('new-email').value;
+
+            const response = await fetch('http://localhost:5000/api/auth/profile', {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: newUsername, email: newEmail })
+            });
+
+            const data = await response.json();
+            if (response.status === 200) {
+                alert('Profile updated!');
+                getProfile();
+                document.getElementById('edit-profile-form').style.display = 'none';
+            } else {
+                alert(data.message);
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        });
+
+        getProfile();
+    </script>
+</body>
+</html>
